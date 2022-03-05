@@ -16,7 +16,7 @@
                 </div>
                 <!-- 用户头像 -->
                 <div class="user-avator">
-                    <img src="../../assets/img/img.jpg" />
+                    <img :src="getASD" />
                 </div>
                 <!-- 用户名下拉菜单 -->
                 <el-dropdown class="user-name" trigger="click" @command="handleCommand">
@@ -35,19 +35,27 @@
 </template>
 <script>
 import bus from '../common/bus';
+import store from '../../store';
 export default {
     data() {
         return {
             collapse: false,
             fullscreen: false,
-            name: this.GLOBAL.userInfo.name
+            name: store.state.userInfo.name
         };
+    },
+    computed: {
+        getASD: {
+            get() {
+                return require('../../assets/img/' + store.state.userInfo.head + '.jpg');
+            }
+        }
     },
     methods: {
         // 用户名下拉菜单选择事件
         handleCommand(command) {
             if (command == 'loginout') {
-                this.GLOBAL.token = '';
+                store.state.token = '';
                 this.$router.push('/login');
             } else if (command == 'changeInformation') {
                 this.$router.push('/userInformation');

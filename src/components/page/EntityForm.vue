@@ -14,7 +14,7 @@
                     >
                         <el-select v-model="IsSelected" slot="prepend" clearable="true">
                             <el-option value="1" label="标签" class="labelClass"></el-option>
-                            <el-option value="2" label="实体" class="labelClass"></el-option>
+                            <el-option value="2" label="名字" class="labelClass"></el-option>
                         </el-select>
                     </el-input>
                     <el-button type="primary" icon="el-icon-refresh" @click="handleRefresh" style="margin-left: 15px">刷新</el-button>
@@ -29,7 +29,9 @@
                 :cell-style="{ 'text-align': 'center' }"
                 :header-cell-style="{ 'text-align': 'center' }"
                 @selection-change="selected"
+                @select-all="selectAll"
                 class="table"
+                ref="entityForm"
             >
                 <el-table-column type="selection" width="55px"> </el-table-column>
                 <el-table-column prop="id" label="id" width="150px"></el-table-column>
@@ -37,12 +39,12 @@
                 <el-table-column prop="name" label="实体名称" width="400px"></el-table-column>
                 <el-table-column fixed="right" label="操作" width="150px">
                     <template slot-scope="scope">
-                        <el-button @click="handleClick(scope.row)" type="text" size="small">查看</el-button>
-                        <el-button type="text" size="small" @click="handleEdit(scope.row)">编辑</el-button>
+                        <el-button @click="handleClick(scope.row)" type="text" size="small" icon="el-icon-view">查看</el-button>
+                        <el-button type="text" size="small" @click="handleEdit(scope.row)" icon="el-icon-edit">编辑</el-button>
                     </template>
                 </el-table-column>
             </el-table>
-            <div class="pagination">
+            <div class="pagination" v-if="pd == true">
                 <el-pagination
                     background
                     layout="total, prev, pager, next"
@@ -95,8 +97,8 @@
     </div>
 </template>
 <script>
-import Axios from 'axios';
 import neovis from '../../utils/neovis';
+import store from '../../store';
 export default {
     name: 'EntityForm',
     data() {
@@ -104,6 +106,7 @@ export default {
             haveSelected: [],
             addVisible: false,
             editVisible: false,
+            pd: true,
             IsSelected: '',
             controller: '',
             currentPage: 1,
@@ -115,6 +118,7 @@ export default {
                 name: ''
             },
             pageTotal: 32,
+            account: store.state.userInfo.account,
             entityForm: [
                 {
                     id: 15,
@@ -161,6 +165,7 @@ export default {
                 that.$data.pageTotal = res.data;
             });
             this.$data.currentPage = 1;
+            that.pd = true;
         },
         handleEdit(res) {
             console.log(res);
@@ -172,12 +177,23 @@ export default {
             this.$data.addVisible = false;
             let that = this;
             this.$axios
-                .post('/api/add_entity', { label: that.$data.addEntityFrom.label, name: that.$data.addEntityFrom.name })
+                .post('/api/add_entity', {
+                    label: that.$data.addEntityFrom.label,
+                    name: that.$data.addEntityFrom.name,
+                    account: this.account
+                })
                 .then(res => {
-                    that.$message({
-                        message: '插入数据成功',
-                        type: 'success'
-                    });
+                    if (res.data == -1) {
+                        that.$message({
+                            message: '插入数据成功',
+                            type: 'success'
+                        });
+                    } else {
+                        that.$message({
+                            message: '插入数据失败,数据库中已存在该实体，实体Id为' + res.data,
+                            type: 'error'
+                        });
+                    }
                 });
         },
         edit() {
@@ -188,13 +204,21 @@ export default {
                 .post('/api/change_entity', {
                     label: that.$data.addEntityFrom.label,
                     name: that.$data.addEntityFrom.name,
-                    id: that.$data.addEntityFrom.id
+                    id: that.$data.addEntityFrom.id,
+                    account: this.account
                 })
                 .then(res => {
-                    that.$message({
-                        message: '修改数据成功',
-                        type: 'success'
-                    });
+                    if (res.data == -1) {
+                        that.$message({
+                            message: '修改数据成功',
+                            type: 'success'
+                        });
+                    } else {
+                        that.$message({
+                            message: '修改后的实体已在数据库中存在',
+                            type: 'error'
+                        });
+                    }
                 })
                 .catch(err => {
                     console.log(err);
@@ -213,6 +237,7 @@ export default {
                 .then(res => {
                     console.log(res);
                     that.$data.entityForm = res.data;
+                    that.pd = false;
                 })
                 .catch(err => {
                     console.log(err);
@@ -272,19 +297,75 @@ export default {
         },
         handleDelete() {
             let that = this;
-            this.$axios.post('/api/remove_entity', { id: that.$data.haveSelected[0].id }).then(res => {
-                that.$message({
-                    message: '删除数据成功',
-                    type: 'success'
-                });
-            });
+            if (this.haveSelected[0] != undefined) {
+                this.$confirm('确定删除该实体?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'success',
+                    center: true
+                })
+                    .then(() => {
+                        that.$axios.post('/api/remove_entity', { id: that.$data.haveSelected[0].id, account: that.account }).then(res => {
+                            if (res.data == 0) {
+                                that.$message({
+                                    message: '删除数据成功',
+                                    type: 'success'
+                                });
+                                that.handleRefresh();
+                            } else {
+                                that.$confirm(`删除数据失败,该实体存在${res.data}条关系,请确认是否继续删除?`, '提示', {
+                                    confirmButtonText: '确定',
+                                    cancelButtonText: '取消',
+                                    type: 'warning',
+                                    center: true
+                                })
+                                    .then(() => {
+                                        that.$axios
+                                            .post('/api/insist_remove_entity', {
+                                                account: that.account,
+                                                id: that.$data.haveSelected[0].id
+                                            })
+                                            .then(() => {
+                                                that.$message({
+                                                    type: 'success',
+                                                    message: '删除实体成功'
+                                                });
+                                                that.handleRefresh();
+                                            });
+                                    })
+                                    .catch(() => {
+                                        that.$message({
+                                            type: 'info',
+                                            message: '已取消'
+                                        });
+                                    });
+                            }
+                        });
+                    })
+                    .catch(() => {
+                        that.$message({
+                            message: '已取消',
+                            type: 'info'
+                        });
+                    });
+            }
         },
         watchClose() {
             this.$data.controller = '';
         },
         selected(selection) {
-            this.$data.haveSelected = selection;
-            console.log(selection);
+            if (selection.length > 1) {
+                this.haveSelected[0] = selection[1];
+                let k = selection.shift();
+                this.$refs.entityForm.toggleRowSelection(k, false);
+            } else {
+                this.haveSelected[0] = selection[0];
+            }
+            //console.log(selection);
+        },
+        selectAll(selection) {
+            this.haveSelected = [];
+            this.$refs.entityForm.clearSelection();
         },
         neo4jLoad() {
             var viz;
@@ -329,10 +410,11 @@ export default {
         this.$axios.post('/api/count_entity').then(res => {
             that.$data.pageTotal = res.data;
         });
+        that.pd = true;
     }
 };
 </script>
-<style scoped>
+<style scoped >
 .container {
     display: flex;
     flex-direction: column;

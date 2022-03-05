@@ -25,10 +25,12 @@
             :cell-style="{ 'text-align': 'center' }"
             :header-cell-style="{ 'text-align': 'center' }"
             @selection-change="selected"
+            @select-all="selectAll"
             :total="pageTotal"
             @current-change="handlePageChange"
             @prev-click="handlePagePrev"
             @next-click="handlePageNext"
+            ref="questionTem"
             class="table"
         >
             <el-table-column type="selection" width="75px"> </el-table-column>
@@ -38,10 +40,23 @@
             <el-table-column fixed="right" label="操作" width="150px">
                 <template slot-scope="scope">
                     <!-- <el-button @click="handleClick(scope.row)" type="text" size="small">查看</el-button> -->
-                    <el-button type="text" size="small" @click="handleEdit(scope.row)">编辑</el-button>
+                    <el-button type="text" size="small" @click="handleEdit(scope.row)" icon="el-icon-edit">编辑</el-button>
                 </template>
             </el-table-column>
         </el-table>
+        <div class="pagination" v-if="pd == true">
+            <el-pagination
+                background
+                layout="total, prev, pager, next"
+                :current-page="currentPage"
+                :page-size="10"
+                :total="pageTotal"
+                @current-change="handlePageChange"
+                @prev-click="handlePagePrev"
+                @next-click="handlePageNext"
+                @selection-change="selected"
+            ></el-pagination>
+        </div>
         <el-dialog :visible.sync="addVisible" title="添加模板问题" width="30%">
             <el-form ref="addEntity" :model="addQuestionTemplate">
                 <el-form-item label="问题模板:" label-width="120px">
@@ -62,7 +77,7 @@
                     <el-input v-model="changeQuestionTemplate.questionTemplate" />
                 </el-form-item>
                 <el-form-item label="准确问题:" label-width="120px">
-                    <el-input v-model="changeQuestionTemplate.preciseQuestion" />
+                    <el-input v-model="changeQuestionTemplate.preciseQuestion" disabled />
                 </el-form-item>
             </el-form>
             <span slot="footer">
@@ -74,6 +89,7 @@
 </template>
 <script>
 import Axios from 'axios';
+import store from '../../store';
 export default {
     name: 'QuestionTemplateForm',
     data() {
@@ -83,9 +99,12 @@ export default {
             questionTemplateForm: [],
             oldTemplate: '',
             pageTotal: 32,
+            currentPage: 1,
+            pd: true,
             searchContent: '',
             haveSelect: [],
             IsSelected: '',
+            account: store.state.userInfo.account,
             changeQuestionTemplate: {},
             addQuestionTemplate: {
                 questionTemplate: '',
@@ -94,6 +113,26 @@ export default {
         };
     },
     methods: {
+        handlePagePrev() {
+            this.currentPage = this.currentPage - 1;
+        },
+        handlePageNext() {
+            this.currentPage = this.currentPage + 1;
+        },
+        handlePageChange(val) {
+            console.log(val);
+            this.currentPage = val;
+            let that = this;
+            this.$axios
+                .post('/api/get_template', {
+                    start: this.currentPage * 10 - 9,
+                    number: '10'
+                })
+                .then(response => {
+                    console.log(response);
+                    that.questionTemplateForm = response.data;
+                });
+        },
         handleSearch() {
             let that = this;
             console.log(this.IsSelected);
@@ -104,33 +143,39 @@ export default {
                 })
                 .then(response => {
                     that.questionTemplateForm = response.data;
+                    that.pd = false;
                 });
-            this.$axios
-                .post('/api/get_template', {
-                    start: '1',
-                    number: '10'
-                })
-                .then(response => {
-                    console.log(response);
-                    that.questionTemplateForm = response.data;
-                });
-            this.$axios.post('/api/count_template').then(response => {
-                that.pageTotal = response.data;
-            });
         },
         handleDelete() {
             let that = this;
-            this.$axios
-                .post('/api/remove_template', {
-                    questionTemplate: that.haveSelect[0].questionTemplate
+            if (this.haveSelect[0] != undefined) {
+                this.$confirm('确定删除该问题?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'success',
+                    center: true
                 })
-                .then(response => {
-                    that.$message({
-                        message: '删除数据成功',
-                        type: 'success'
+                    .then(() => {
+                        that.$axios
+                            .post('/api/remove_template', {
+                                questionTemplate: that.haveSelect[0].questionTemplate,
+                                account: that.account
+                            })
+                            .then(response => {
+                                that.$message({
+                                    message: '删除数据成功',
+                                    type: 'success'
+                                });
+                                that.handleRefresh();
+                            });
+                    })
+                    .catch(() => {
+                        that.$message({
+                            message: '已取消',
+                            type: 'info'
+                        });
                     });
-                });
-            this.handleRefresh();
+            }
         },
         changeTemplate() {
             let that = this;
@@ -138,7 +183,8 @@ export default {
                 .post('/api/change_template', {
                     questionId: that.changeQuestionTemplate.id,
                     oldTemplate: that.oldTemplate,
-                    newTemplate: that.changeQuestionTemplate.questionTemplate
+                    newTemplate: that.changeQuestionTemplate.questionTemplate,
+                    account: that.account
                 })
                 .then(() => {
                     that.$message({
@@ -146,6 +192,7 @@ export default {
                         type: 'success'
                     });
                     that.changeVisible = false;
+                    that.handleRefresh();
                 });
         },
         handleEdit(e) {
@@ -154,9 +201,19 @@ export default {
             this.oldTemplate = e.questionTemplate;
             this.changeVisible = true;
         },
-        selected(e) {
-            console.log(e);
-            this.haveSelect = e;
+        selected(selection) {
+            if (selection.length > 1) {
+                this.haveSelect[0] = selection[1];
+                let k = selection.shift();
+                this.$refs.questionTem.toggleRowSelection(k, false);
+            } else {
+                this.haveSelect[0] = selection[0];
+            }
+            // console.log(this.haveSelect);
+        },
+        selectAll() {
+            this.$refs.questionTem.clearSelection();
+            this.haveSelect = [];
         },
         handleAdd() {
             this.addVisible = true;
@@ -171,6 +228,8 @@ export default {
                 .then(response => {
                     console.log(response);
                     that.questionTemplateForm = response.data;
+                    that.currentPage = 1;
+                    that.pd = true;
                 });
             this.$axios.post('/api/count_template').then(response => {
                 that.pageTotal = response.data;
@@ -184,7 +243,8 @@ export default {
                 this.$axios
                     .post('/api/add_template', {
                         questionTemplate: that.addQuestionTemplate.questionTemplate,
-                        preciseQuestion: that.addQuestionTemplate.preciseQuestion
+                        preciseQuestion: that.addQuestionTemplate.preciseQuestion,
+                        account: that.account
                     })
                     .then(response => {
                         if (response.data == true) {
@@ -193,6 +253,8 @@ export default {
                                 type: 'success'
                             });
                             that.addVisible = false;
+                            that.addQuestionTemplate = {};
+                            that.handleRefresh();
                         } else {
                             that.$message({
                                 message: '插入数据失败，数据库已经存在',

@@ -10,54 +10,73 @@
                 <el-input
                     @keyup.enter.native="handleSearch"
                     v-model="searchContent"
-                    placeholder="用户名或ID"
+                    placeholder="用户手机号"
                     class="handle-input mr10"
+                    oninput="value=value.replace(/[^\d]/g,'')"
+                    maxlength="11"
                 ></el-input>
-                <el-button type="primary" icon="el-icon-refresh" @click="handleRefresh">刷新</el-button>
+                <el-button type="primary" icon="el-icon-refresh" @click="reflesh()">刷新</el-button>
                 <el-button type="primary" icon="el-icon-search" @click="handleSearch">搜索</el-button>
+                <el-button type="primary" icon="el-icon-search" @click="sceen">被禁用用户</el-button>
             </div>
-            <el-table :data="userList" border class="table" ref="multipleTable" header-cell-class-name="table-header">
-                <el-table-column prop="userId" label="ID" width="280" align="center"></el-table-column>
-                <el-table-column prop="userNickname" label="用户名"></el-table-column>
-                <el-table-column label="头像(查看大图)" align="center">
+            <el-table :data="UserManageForm" border class="table" ref="multipleTable" header-cell-class-name="table-header">
+                <el-table-column prop="weChatName" label="微信昵称" width="250px" align="center"></el-table-column>
+                <el-table-column prop="phone" label="手机号" width="180px" align="center"></el-table-column>
+                <el-table-column label="用户状态" width="100px" align="center">
                     <template slot-scope="scope">
-                        <el-image
-                            class="table-td-thumb"
-                            :src="scope.row.userPortrait"
-                            :preview-src-list="[scope.row.userPortrait]"
-                        ></el-image>
-                    </template>
-                </el-table-column>
-                <el-table-column label="状态" width="80" align="center">
-                    <template slot-scope="scope">
-                        <el-tag :type="scope.row.userIsdisable === false ? 'success' : 'danger'">{{
-                            scope.row.userIsdisable === false ? '正常' : '禁用'
+                        <el-tag :type="scope.row.userStatus === '0' ? 'success' : 'danger'">{{
+                            scope.row.userStatus === '0' ? '正常' : '禁用'
                         }}</el-tag>
                     </template>
                 </el-table-column>
-
-                <el-table-column prop="userTime" label="注册时间"></el-table-column>
-                <el-table-column label="操作" width="180" align="center">
+                <el-table-column prop="cause" label="禁用原因" width="265px" align="center"></el-table-column>
+                <el-table-column prop="registerTime" label="注册时间" align="center" width="255px"></el-table-column>
+                <el-table-column
+                    fixed="right"
+                    label="操作"
+                    width="120px
+                "
+                >
                     <template slot-scope="scope">
-                        <div v-if="scope.row.userIsdisable === false">
-                            <el-button type="text" icon="el-icon-circle-close" class="red" @click="handleDisable(scope.$index, scope.row)"
-                                >禁用</el-button
-                            >
-                            <el-button type="text" icon="el-icon-delete" class="red" @click="handleDelete(scope.$index, scope.row)"
-                                >删除</el-button
-                            >
-                        </div>
-                        <div v-if="scope.row.userIsdisable === true">
-                            <el-button type="text" icon="el-icon-circle-check" class="green" @click="handleDisable(scope.$index, scope.row)"
-                                >启用</el-button
-                            >
-                            <el-button type="text" icon="el-icon-delete" class="red" @click="handleDelete(scope.$index, scope.row)"
-                                >删除</el-button
-                            >
-                        </div>
+                        <el-button
+                            v-if="scope.row.userStatus === '0'"
+                            @click="bindForbind(scope.row)"
+                            type="text"
+                            size="small"
+                            style="color: red"
+                            icon="el-icon-error"
+                            >禁用</el-button
+                        >
+                        <el-button
+                            v-else
+                            @click="handleRecoverClick(scope.row)"
+                            type="text"
+                            size="small"
+                            style="color: #07a515"
+                            icon="el-icon-success"
+                            >恢复</el-button
+                        >
+                        <!-- <el-button type="text" size="small" @click="compile(scope.row)">编辑</el-button> -->
                     </template>
                 </el-table-column>
             </el-table>
+            <el-dialog :visible.sync="forbiddenVisible" title="禁用原因" width="30%">
+                <el-form :model="forbiddenReason" class="formClass">
+                    <el-form-item label="用户昵称:" label-width="120px">
+                        <el-input v-model="forbiddenReason.weChatName" disabled></el-input>
+                    </el-form-item>
+                    <el-form-item label="手机号:" label-width="120px">
+                        <el-input v-model="forbiddenReason.phone" disabled></el-input>
+                    </el-form-item>
+                    <el-form-item label="禁用原因:" label-width="120px">
+                        <el-input v-model="forbiddenReason.cause"></el-input>
+                    </el-form-item>
+                </el-form>
+                <span slot="footer">
+                    <el-button @click="forbiddenVisible = false">取 消</el-button>
+                    <el-button type="primary" @click="handleForbiddenClick()">确 定</el-button>
+                </span>
+            </el-dialog>
             <div class="pagination">
                 <el-pagination
                     background
@@ -68,228 +87,153 @@
                     @current-change="handlePageChange"
                     @prev-click="handlePagePrev"
                     @next-click="handlePageNext"
+                    v-if="pd == true"
                 ></el-pagination>
             </div>
         </div>
     </div>
 </template>
-
 <script>
-import { fetchData } from '../../api/index';
-import Axios from 'axios';
-import Vue from 'vue';
+import store from '../../store';
 export default {
-    name: 'basetable',
+    name: 'UserManage',
     data() {
         return {
-            searchContent: '',
-            userList: [],
+            UserManageForm: [],
             currentPage: 1,
-            pageTotal: 0,
-            currentMode: 'AllUserList'
+            pageTotal: 10,
+            account: store.state.userInfo.account,
+            searchContent: '',
+            pd: true,
+            forbiddenVisible: false,
+            forbiddenReason: {}
         };
     },
-    created() {
-        this.getPage(true);
-    },
     methods: {
-        getPage(resetCurrentPage) {
-            if (this.currentMode == 'AllUserList') {
-                //     this.$axios
-                //         .get(this.GLOBAL.baseURL + '/user-server/user/getUserNum', {
-                //             headers: {
-                //                 token: this.GLOBAL.token.token
-                //             }
-                //         })
-                //         .then(response => {
-                //             this.pageTotal = response.data;
-                //             if (resetCurrentPage === true) {
-                //                 this.currentPage = 1;
-                //             }
-                //             this.getData();
-                //         });
-                // } else if (this.currentMode == 'Search') {
-                // this.$axios
-                //     .get(this.GLOBAL.baseURL + '/user-server/user/getSearchNum', {
-                //         params: {
-                //             searchContent: this.searchContent
-                //         },
-                //         headers: {
-                //             token: this.GLOBAL.token.token
-                //         }
-                //     })
-                //     .then(response => {
-                //         this.pageTotal = response.data;
-                //         if (resetCurrentPage === true) {
-                //             this.currentPage = 1;
-                //         }
-                //         this.getData();
-                //     });
-            }
-        },
-        getData() {
-            // if(this.currentMode == 'AllUserList'){
-            //     this.$axios.get(this.GLOBAL.baseURL + '/user-server/user/getUserList',{
-            //         params: {
-            //             pageStart: (this.currentPage-1)*10
-            //         },
-            //         headers: {
-            //             'token': this.GLOBAL.token.token
-            //         }
-            //     }).then((response) => {
-            //         this.userList = response.data;
-            //     })
-            // }
-            // else if(this.currentMode == 'Search'){
-            //     this.$axios.get(this.GLOBAL.baseURL + '/user-server/user/adminSearch',{
-            //         params: {
-            //             searchContent: this.searchContent,
-            //             pageStart: (this.currentPage-1)*10
-            //         },
-            //         headers: {
-            //             'token': this.GLOBAL.token.token
-            //         }
-            //     }).then((response) => {
-            //         if(response.data.length == 0){
-            //             this.userList=[];
-            //         }
-            //         else{
-            //             this.userList = response.data;
-            //         }
-            //     })
-            // }
-        },
-        //触发刷新
-        handleRefresh() {
-            this.currentMode = 'AllUserList';
-            this.searchContent = '';
-            this.getPage(true);
-        },
-        // 触发搜索按钮
-        handleSearch() {
-            this.currentMode = 'Search';
-            this.getPage(true);
-        },
-        // 删除操作
-        handleDelete(index, row) {
-            // 二次确认删除
-            var that = this;
-            this.$confirm('确定要删除吗？', '提示', {
-                type: 'warning'
-            }).then(() => {
-                this.$axios({
-                    method: 'post',
-                    url: this.GLOBAL.baseURL + '/user-server/user/deleteUser',
-                    data: this.qs.stringify({
-                        userId: this.userList[index].userId
-                    }),
-                    headers: {
-                        token: this.GLOBAL.token.token
-                    }
-                })
-                    .then(function(response) {
-                        that.getPage(false);
-                        if (that.searchContent == '') {
-                            that.getData();
-                        } else {
-                            that.handleSearch();
-                        }
-                        that.$message({
-                            message: '删除成功',
-                            type: 'success'
-                        });
-                    })
-                    .catch(function(error) {
-                        that.$message({
-                            message: '操作失败',
-                            type: 'error'
-                        });
-                    });
-            });
-        },
-        handleDisable(index, row) {
-            var temp = this.userList[index];
-            var that = this;
-            if (this.userList[index].userIsdisable === false) {
-                this.$confirm('确定要禁用该用户吗？', '提示', {
-                    type: 'warning'
-                })
-                    .then(() => {
-                        this.$axios({
-                            method: 'post',
-                            url: this.GLOBAL.baseURL + '/user-server/user/disableUser',
-                            data: this.qs.stringify({
-                                userId: this.userList[index].userId
-                            }),
-                            headers: {
-                                token: this.GLOBAL.token.token
-                            }
-                        })
-                            .then(function(response) {
-                                temp.userIsdisable = true;
-                                Vue.set(that.userList, index, temp);
-                                that.$message({
-                                    message: '禁用成功',
-                                    type: 'success'
-                                });
-                            })
-                            .catch(function(error) {
-                                temp.userIsdisable = false;
-                                that.$set(that.userList, index, temp);
-                                that.$message({
-                                    message: '操作失败',
-                                    type: 'error'
-                                });
-                            });
-                    })
-                    .catch(() => {
-                        temp.userIsdisable = false;
-                        Vue.set(that.userList, index, temp);
-                    });
-            } else {
-                this.$axios({
-                    method: 'post',
-                    url: this.GLOBAL.baseURL + '/user-server/user/ableUser',
-                    data: this.qs.stringify({
-                        userId: that.userList[index].userId
-                    }),
-                    headers: {
-                        token: this.GLOBAL.token.token
-                    }
-                })
-                    .then(function(response) {
-                        temp.userIsdisable = false;
-                        Vue.set(that.userList, index, temp);
-                        that.$message({
-                            message: '启用成功',
-                            type: 'success'
-                        });
-                    })
-                    .catch(function(error) {
-                        temp.userIsdisable = true;
-                        that.$set(that.userList, index, temp);
-                        that.$message({
-                            message: '操作失败',
-                            type: 'error'
-                        });
-                    });
-            }
-        },
-        // 分页导航
-        handlePageChange(val) {
-            this.currentPage = val;
-            this.getData();
-        },
-        handlePagePrev() {
-            this.currentPage--;
+        bindForbind(e) {
+            this.forbiddenReason = e;
+            this.forbiddenVisible = true;
         },
         handlePageNext() {
-            this.currentPage++;
+            this.currentPage += 1;
+        },
+        handlePagePrev() {
+            this.currentPage -= 1;
+        },
+        handlePageChange(val) {
+            this.currentPage = val;
+            let that = this;
+            this.$axios.post('/api/get_wechat_user', { start: this.currentPage * 10 - 9, number: 10 }).then(response => {
+                that.UserManageForm = response.data;
+                that.UserManageForm.forEach(i => {
+                    i.registerTime = i.registerTime.substring(0, 19).replace('T', ' ');
+                });
+            });
+        },
+        handleForbiddenClick() {
+            let that = this;
+            let e = this.forbiddenReason;
+
+            this.$axios
+                .post('/api/disable_user', {
+                    phone: e.phone,
+                    cause: e.cause,
+                    account: that.account
+                })
+                .then(() => {
+                    that.$message({
+                        message: '禁用用户成功',
+                        type: 'success'
+                    });
+                    that.reflesh();
+                    that.forbiddenVisible = false;
+                });
+        },
+        sceen() {
+            let that = this;
+            this.$axios
+                .post('/api/screen_user', {
+                    status: 1
+                })
+                .then(response => {
+                    that.UserManageForm = response.data;
+                    that.UserManageForm = response.data;
+                    that.UserManageForm.forEach(i => {
+                        i.registerTime = i.registerTime.substring(0, 19).replace('T', ' ');
+                    });
+                    that.pd = false;
+                });
+        },
+        handleRecoverClick(e) {
+            let that = this;
+            that.$confirm('确定恢复该用户?', '提示', {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'success',
+                center: true
+            })
+                .then(() => {
+                    that.$axios
+                        .post('/api/able_user', {
+                            phone: e.phone,
+                            account: this.account
+                        })
+                        .then(() => {
+                            that.$message({
+                                message: '恢复用户成功',
+                                type: 'success'
+                            });
+                            that.reflesh();
+                        });
+                })
+                .catch(() => {
+                    that.$message({
+                        message: '已取消',
+                        type: 'info'
+                    });
+                });
+        },
+        handleSearch() {
+            let that = this;
+            this.$axios.post('/api/search_user', { phone: this.searchContent }).then(response => {
+                that.UserManageForm = response.data;
+                that.UserManageForm.forEach(i => {
+                    i.registerTime = i.registerTime.substring(0, 19).replace('T', ' ');
+                });
+                that.pd = false;
+            });
+        },
+        reflesh() {
+            let that = this;
+            that.pd = true;
+            this.$axios.post('/api/get_wechat_user', { start: 1, number: 10 }).then(response => {
+                that.UserManageForm = response.data;
+                that.UserManageForm.forEach(i => {
+                    i.registerTime = i.registerTime.substring(0, 19).replace('T', ' ');
+                });
+            });
+            this.$axios.post('/api/count_wechat_user').then(response => {
+                that.pageTotal = response.data;
+            });
+            that.pd = true;
+            that.searchContent = '';
         }
+    },
+    mounted() {
+        let that = this;
+        this.$axios.post('/api/get_wechat_user', { start: 1, number: 10 }).then(response => {
+            that.UserManageForm = response.data;
+            that.UserManageForm.forEach(i => {
+                i.registerTime = i.registerTime.substring(0, 19).replace('T', ' ');
+            });
+        });
+        this.$axios.post('/api/count_wechat_user').then(response => {
+            that.pageTotal = response.data;
+        });
+        that.pd = true;
     }
 };
 </script>
-
 <style scoped>
 .handle-box {
     margin-bottom: 20px;
@@ -316,6 +260,7 @@ export default {
 .table-td-thumb {
     display: block;
     margin: auto;
+
     width: 40px;
     height: 40px;
 }

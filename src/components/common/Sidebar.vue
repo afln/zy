@@ -47,18 +47,24 @@
 
 <script>
 import bus from '../common/bus';
+import store from '../../store';
 export default {
     data() {
         return {
             collapse: false,
             items: [
                 {
+                    icon: 'el-icon-data-analysis',
+                    index: 'Dashboard',
+                    title: '首页'
+                },
+                {
                     icon: 'el-icon-user',
                     index: 'UserManage',
                     title: '用户管理'
                 },
                 {
-                    icon: 'el-icon-user',
+                    icon: 'el-icon-s-custom',
                     index: 'AdminManage',
                     title: '管理员管理'
                 },
@@ -78,12 +84,12 @@ export default {
                     title: '关系表管理'
                 },
                 {
-                    icon: 'el-icon-coin',
+                    icon: 'el-icon-notebook-1',
                     index: 'QuestionForm',
                     title: '问题表管理'
                 },
                 {
-                    icon: 'el-icon-coin',
+                    icon: 'el-icon-notebook-2',
                     index: 'QuestionTemplateForm',
                     title: '问题模板表管理'
                 },
@@ -91,6 +97,11 @@ export default {
                     icon: 'el-icon-edit-outline',
                     index: 'FeedbackForm',
                     title: '用户反馈表'
+                },
+                {
+                    icon: 'el-icon-document-remove',
+                    index: 'Logs',
+                    title: '日志'
                 }
                 // {
                 //     title: '问题表管理',
@@ -104,7 +115,7 @@ export default {
                 //     ]
                 // }
             ],
-            userInfo: this.GLOBAL.userInfo
+            userInfo: store.state.userInfo
         };
     },
     computed: {

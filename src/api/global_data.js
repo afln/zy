@@ -5,7 +5,7 @@ const userInfo = {
   name: 'test',
   account: 'afln',
   phone: '110',
-  head: '',
+  head: '2',
   email: '100@qq.com',
   register_time: '2021-01-01 00:00:00',
   password: 'test'

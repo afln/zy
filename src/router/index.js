@@ -8,13 +8,18 @@ export default new Router({
     routes: [
         {
             path: '/',
-            redirect: '/UserManage'
+            redirect: '/Dashboard'
         },
         {
             path: '/',
             component: () => import(/* webpackChunkName: "home" */ '../components/common/Home.vue'),
             meta: { title: '自述文件' },
             children: [
+                {
+                    path: '/Dashboard',
+                    component: () => import(/* webpackChunkName: "dashboard" */ '../components/page/Dashboard.vue'),
+                    meta: { title: '首页' }
+                },
                 {
                     path: '/UserManage',
                     component: () => import(/* webpackChunkName: "dashboard" */ '../components/page/UserManage.vue'),
@@ -53,29 +58,26 @@ export default new Router({
                 {
                     path: '/questionForm',
                     component: () => import(/* webpackChunkName:"question"*/ '../components/page/QuestionForm.vue'),
-                    meta: {
-                        title: '问题表管理'
-                    }
+                    meta: {title: '问题表管理'}
                 },
                 {
                     path: '/questionTemplateForm', component: () => import(/* webpackChunkName: */ '../components/page/QuestionTemplateForm.vue'),
-                    meta: {
-                        title: '问题模板表管理'
-                    }
+                    meta: {title: '问题模板表管理' }
                 },
                 {
                     path: '/feedbackForm',
                     component: () => import(/* webpackChunkName: */ '../components/page/FeedbackForm.vue'),
-                    meta: {
-                        title: '用户反馈管理'
-                    }
+                    meta: {title: '用户反馈管理'}
                 },
                 {
                     path: '/userInformation',
                     component: () => import(/* webpackChunkName: */ '../components/page/UserInformation.vue'),
-                    meta: {
-                        title:'个人信息修改'
-                     }
+                    meta: {title:'个人信息修改'}
+                },
+                {
+                    path: '/logs',
+                    component: () => import(/* webpackChunkName: */ '../components/page/Logs.vue'),
+                    meta: {title:'后台管理系统日志'}
                 }
             ]
         },

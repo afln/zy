@@ -19,8 +19,18 @@
                         ></el-input>
                     </el-form-item>
                     <el-form-item label="验证码:" label-width="100px" style="margin-top: 30px">
-                        <el-input v-model="userInformation.verification" style="width: 200px" placeholder="请输入验证码"></el-input>
-                        <el-button type="info" @click="onSubmit()" style="margin-left: 10px; background-color: rgba(53, 54, 54, 0.368)"
+                        <el-input
+                            v-model="userInformation.verification"
+                            style="width: 200px"
+                            placeholder="请输入验证码"
+                            oninput="value=value.replace(/[^\d]/g,'')"
+                            maxlength="6"
+                        ></el-input>
+                        <el-button
+                            type="info"
+                            @click="onSubmit()"
+                            style="margin-left: 10px; background-color: rgba(53, 54, 54, 0.368)"
+                            :disabled="wpd"
                             >发送验证码</el-button
                         >
                     </el-form-item>
@@ -79,7 +89,9 @@ export default {
                 verification: ''
             },
             verification: '',
-            pd: true
+            pd: true,
+            wpd: false,
+            cxk: false
         };
     },
     methods: {
@@ -105,11 +117,6 @@ export default {
                         phoneNumber: that.userInformation.phone
                     })
                     .then(function(response) {
-                        that.$message({
-                            message: '发送短信成功',
-                            type: 'success'
-                        });
-
                         if (response.data == '账号与手机号不匹配!') {
                             that.$message({
                                 message: '账号与手机号不匹配,请重新输入!',
@@ -118,7 +125,14 @@ export default {
                             that.userInformation.account = '';
                             that.userInformation.phone = '';
                         } else {
+                            that.$message({
+                                message: '发送短信成功',
+                                type: 'success'
+                            });
+                            console.log(response.data);
+                            that.cxk = true;
                             that.verification = response.data;
+                            that.wpd = true;
                         }
                     });
             }
@@ -134,7 +148,22 @@ export default {
                     message: '请输入用户手机号',
                     type: 'error'
                 });
-            } else if ((this.verification = this.userInformation.verification)) {
+            } else if (this.userInformation.phone.length !== 11) {
+                this.$message({
+                    message: '请输入正确的手机号',
+                    type: 'error'
+                });
+            } else if (this.cxk == false) {
+                this.$message({
+                    message: '请发送验证码',
+                    type: 'error'
+                });
+            } else if (
+                this.verification == this.userInformation.verification &&
+                this.userInformation.verification != null &&
+                this.userInformation.verification != ''
+            ) {
+                this.userInformation.verification = null;
                 this.pd = false;
             } else {
                 this.$message({

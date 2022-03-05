@@ -45,7 +45,7 @@ export default {
                 msg[i].name && arr.push(msg[i].name);
             }
             this.tagsList = arr;
-        });
+        }); //接收到tags信息就将其保存在keep-alive
     }
 };
 </script>

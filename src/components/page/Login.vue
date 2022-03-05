@@ -9,7 +9,13 @@
                     </el-input>
                 </el-form-item>
                 <el-form-item prop="password">
-                    <el-input type="password" placeholder="password" v-model="param.password" @keyup.enter.native="submitForm()">
+                    <el-input
+                        type="password"
+                        placeholder="password"
+                        show-password="true"
+                        v-model="param.password"
+                        @keyup.enter.native="submitForm()"
+                    >
                         <el-button slot="prepend" icon="el-icon-lx-lock"></el-button>
                     </el-input>
                 </el-form-item>
@@ -27,6 +33,7 @@
 </template>
 
 <script>
+import store from '../../store';
 export default {
     data: function() {
         return {
@@ -41,13 +48,7 @@ export default {
             }
         };
     },
-    created() {
-        if (this.GLOBAL.token == '') {
-            console.log(this.GLOBAL.token);
-        } else {
-            this.$router.replace('/');
-        }
-    },
+    created() {},
     methods: {
         submitForm() {
             // if (this.$data.param.username == 'test' && this.$data.param.password == 'test') {
@@ -61,6 +62,7 @@ export default {
             //     }
             // }
             let that = this;
+            console.log(store);
             this.$axios
                 .post('/api/web_login', {
                     account: that.param.username,
@@ -71,8 +73,11 @@ export default {
                     console.log(response);
                     if (response.data) {
                         // this.GLOBAL.token = response.data.token;
-                        that.GLOBAL.token = 'asasadad';
-                        that.GLOBAL.userInfo = response.data;
+                        store.commit('setToken', 'asasadad');
+                        store.commit('setUserinfomation', response.data);
+
+                        console.log(store.state.userInfo);
+                        // sessionStorage.setItem(head, '1');
                         that.$message({
                             message: '登录成功',
                             type: 'success'

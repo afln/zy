@@ -27,12 +27,12 @@
                         </el-form-item>
                         <el-form-item label="类型:" label-width="80px" style="margin-top: 30px">
                             <el-radio-group disabled v-model="userInformation.adminType">
-                                <el-radio v-model="userInformation.adminType" label="2">普通管理员 </el-radio>
+                                <el-radio v-model="userInformation.adminType" label="0">普通管理员 </el-radio>
                                 <el-radio v-model="userInformation.adminType" label="1"> 超级管理员</el-radio>
                             </el-radio-group>
                         </el-form-item>
                         <div style="display: flex; justify-content: space-between; width: 100%">
-                            <el-button style="margin-left: 30px">取消</el-button>
+                            <el-button style="margin-left: 30px" @click="cancel">恢复</el-button>
                             <el-button type="primary" @click="onSubmit">保存修改</el-button>
                         </div>
                     </el-form>
@@ -42,6 +42,7 @@
     </div>
 </template>
 <script>
+import store from '../../store';
 export default {
     name: 'UserInformation',
     data() {
@@ -50,10 +51,36 @@ export default {
         };
     },
     methods: {
-        onSubmit() {}
+        onSubmit() {
+            if (this.userInformation.phone.length != 11) {
+                this.$message({
+                    message: '请输入正确的手机号',
+                    type: 'error'
+                });
+            } else {
+                let that = this;
+                this.$axios
+                    .post('/api/change_self_info', {
+                        phone: this.userInformation.phone,
+                        email: this.userInformation.email,
+                        password: this.userInformation.password,
+                        account: this.userInformation.account
+                    })
+                    .then(() => {
+                        that.$message({
+                            message: '修改信息成功',
+                            type: 'success'
+                        });
+                        store.commit('setUserinfomation', that.userInformation);
+                    });
+            }
+        },
+        cancel() {
+            this.userInformation = JSON.parse(JSON.stringify(store.state.userInfo));
+        }
     },
     mounted() {
-        this.userInformation = this.GLOBAL.userInfo;
+        this.userInformation = JSON.parse(JSON.stringify(store.state.userInfo));
     }
 };
 </script>

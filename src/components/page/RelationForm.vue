@@ -14,7 +14,7 @@
                     >
                         <el-select v-model="IsSelected" slot="prepend">
                             <el-option value="1" label="标签" class="labelClass"></el-option>
-                            <el-option value="2" label="实体" class="labelClass"></el-option>
+                            <el-option value="2" label="名字" class="labelClass"></el-option>
                         </el-select>
                     </el-input>
                     <el-button type="primary" icon="el-icon-refresh" @click="handleRefresh" style="margin-left: 15px">刷新</el-button>
@@ -29,7 +29,9 @@
                 :cell-style="{ 'text-align': 'center' }"
                 :header-cell-style="{ 'text-align': 'center' }"
                 @selection-change="selected"
+                @select-all="selectAll"
                 class="table"
+                ref="relationFormsa"
             >
                 <el-table-column type="selection" width="55px" label="全选"> </el-table-column>
                 <el-table-column prop="startEntityLabel" label="起始实体标签" width="210px"></el-table-column>
@@ -45,8 +47,8 @@
                 "
                 >
                     <template slot-scope="scope">
-                        <el-button @click="handleClick(scope.row)" type="text" size="small">查看</el-button>
-                        <el-button type="text" size="small" @click="compile(scope.row)">编辑</el-button>
+                        <el-button @click="handleClick(scope.row)" type="text" size="small" icon="el-icon-view">查看</el-button>
+                        <el-button type="text" size="small" @click="compile(scope.row)" icon="el-icon-edit">编辑</el-button>
                     </template>
                 </el-table-column>
             </el-table>
@@ -55,7 +57,7 @@
                     <div id="viz" style="width: 100%; height: 400px"></div>
                 </frame>
             </el-dialog>
-            <div class="pagination">
+            <div class="pagination" v-if="pd == true">
                 <el-pagination
                     background
                     layout="total, prev, pager, next"
@@ -134,20 +136,24 @@
 </template>
 <script>
 import neovis from '../../utils/neovis';
+import store from '../../store';
 export default {
     name: 'RelationForm',
     data() {
         return {
             addVisible: false,
             watchVisible: false,
+            pd: true,
             compileVisible: false,
             IsSelected: '', //查询的选择是标签还是实体
             controller: '',
+            current: 1,
             searchContent: '',
-            haveSelected: '',
+            haveSelected: [],
             relationSelect: [], //所有标签类型
             entitySelect: [], //所有实体标签
             pageTotal: 32, //当前页面有多少条信息。
+            account: store.state.userInfo.account,
             oneRelation: {},
             addRelation: {
                 startEntityName: '',
@@ -174,10 +180,30 @@ export default {
         };
     },
     methods: {
+        handlePageChange(val) {
+            console.log(val);
+            this.current = val;
+            let that = this;
+            this.$axios
+                .post('/api/get_relation', {
+                    start: this.current,
+                    number: '10'
+                })
+                .then(response => {
+                    console.log(response);
+                    that.relationForm = response.data;
+                });
+        },
+        handlePagePrev() {
+            this.current = this.current - 1;
+        },
+        handlePageNext() {
+            this.current = this.current + 1;
+        },
         handleRefresh() {
             let that = this;
             this.searchContent = '';
-            this.haveSelected = '';
+            this.haveSelected = [];
             this.IsSelected = '';
             this.$axios
                 .post('/api/get_relation', {
@@ -199,6 +225,7 @@ export default {
             this.$axios.post('/api/get_entity_label').then(response => {
                 that.entitySelect = response.data;
             });
+            that.pd = true;
         },
         handleAdd() {
             this.$data.addVisible = true;
@@ -213,32 +240,58 @@ export default {
                 label: ''
             };
         },
-        selected(seletion) {
-            this.$data.haveSelected = seletion;
-            console.log(seletion);
+        selected(selection) {
+            if (selection.length > 1) {
+                this.haveSelected[0] = selection[1];
+                let k = selection.shift();
+                this.$refs.relationFormsa.toggleRowSelection(k, false);
+            } else {
+                this.haveSelected[0] = selection[0];
+            }
+            console.log(this.haveSelected);
+        },
+        selectAll(selection) {
+            this.$refs.relationFormsa.clearSelection();
         },
         handleDelete() {
             let that = this;
-            this.$axios
-                .post('/api/remove_relation', {
-                    startEntityId: that.haveSelected[0].startEntityId,
-                    endEntityId: that.haveSelected[0].endEntityId,
-                    label: that.haveSelected[0].relationLabel,
-                    relation: that.haveSelected[0].relationName
+            if (this.haveSelected[0] != undefined) {
+                that.$confirm('确定删除该关系?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'success',
+                    center: true
                 })
-                .then(() => {
-                    that.$message({
-                        message: '删除关系成功',
-                        type: 'success'
+                    .then(() => {
+                        that.$axios
+                            .post('/api/remove_relation', {
+                                startEntityId: that.haveSelected[0].startEntityId,
+                                endEntityId: that.haveSelected[0].endEntityId,
+                                label: that.haveSelected[0].relationLabel,
+                                relation: that.haveSelected[0].relationName,
+                                account: that.account
+                            })
+                            .then(() => {
+                                that.$message({
+                                    message: '删除关系成功',
+                                    type: 'success'
+                                });
+                            })
+                            .catch(() => {
+                                that.$message({
+                                    message: '删除关系失败',
+                                    type: 'error'
+                                });
+                            });
+                        that.handleRefresh();
+                    })
+                    .catch(() => {
+                        that.$message({
+                            message: '已取消',
+                            type: 'info'
+                        });
                     });
-                })
-                .catch(() => {
-                    that.$message({
-                        message: '删除关系失败',
-                        type: 'danger'
-                    });
-                });
-            this.handleRefresh();
+            }
         },
         changeRelation() {
             let that = this;
@@ -251,13 +304,21 @@ export default {
                     oldLabel: that.oldRelation.relationLabel,
                     oldName: that.oldRelation.relationName,
                     newLabel: that.oneRelation.relationLabel,
-                    newName: that.oneRelation.relationName
+                    newName: that.oneRelation.relationName,
+                    account: that.account
                 })
-                .then(() => {
-                    that.$message({
-                        message: '修改关系成功',
-                        type: 'success'
-                    });
+                .then(response => {
+                    if (response.data == null) {
+                        that.$message({
+                            message: '修改关系成功',
+                            type: 'success'
+                        });
+                    } else {
+                        that.$message({
+                            message: '修改后的关系数据库中已经存在',
+                            type: 'error'
+                        });
+                    }
                 });
         },
         add() {
@@ -271,14 +332,22 @@ export default {
                     endLabel: that.addRelation.endEntityLabel,
                     endName: that.addRelation.endEntityName,
                     label: that.addRelation.label,
-                    relation: that.addRelation.relation
+                    relation: that.addRelation.relation,
+                    account: that.account
                 })
                 .then(response => {
-                    console.log(response);
-                    that.$message({
-                        message: '插入数据成功',
-                        type: 'success'
-                    });
+                    if (response.data != null) {
+                        that.$message({
+                            message: '插入数据成功',
+                            type: 'success'
+                        });
+                    } else {
+                        that.$message({
+                            message: '数据库中已存在该关系',
+                            type: 'danger'
+                        });
+                    }
+                    that.handleRefresh();
                 })
                 .catch(response => {
                     that.$message({
@@ -296,6 +365,7 @@ export default {
                 })
                 .then(response => {
                     that.relationForm = response.data;
+                    that.pd = false;
                     for (let i = 0; i < response.data.length; ++i) {
                         that.relationForm[i].label = response.data[i].relationLabel;
                         that.relationForm[i].relation = response.data[i].relationName;
@@ -385,6 +455,7 @@ export default {
         this.$axios.post('/api/get_entity_label').then(response => {
             that.entitySelect = response.data;
         });
+        that.pd = true;
     }
 };
 </script>

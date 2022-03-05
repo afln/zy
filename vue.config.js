@@ -6,13 +6,13 @@ module.exports = {
         open: true,
         port: 80,
         proxy: {
-            '/api':{
-                target:'http://47.113.226.5:8081',
+            '/api': {
+                target: 'http://47.113.226.5:8081',
                 // target:'http://localhost:8081',
                 changeOrigin: true,
                 ws: true,
-                pathRewrite:{
-                    '/api':''
+                pathRewrite: {
+                    '/api': ''
                 }
             }
         }

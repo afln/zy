@@ -34,7 +34,7 @@
             </el-input>
 
             <el-button type="primary" icon="el-icon-search" @click="handleRelation">查找</el-button>
-            <el-input-number v-model="num" :step="10" style="margin-left: 20px"></el-input-number>
+            <el-input-number v-model="num" :step="10" style="margin-left: 20px" :min="20" :max="200"></el-input-number>
         </div>
         <div class="handle-box" style="margin-top: 30px"></div>
         <frame style="width: 100%" id="tempHtml" ref="tempHtml" @load="neo4jLoad()">
@@ -68,28 +68,46 @@ export default {
         //     this.$refs.tempHtml.src += '';
         // },
         handleRelation() {
-            let myControl = 'MATCH p=';
-            if (this.IsSelected != '') {
-                myControl += '(:' + this.$data.IsSelected;
-            } else {
-                myControl += '(';
+            let myControl = '';
+            console.log(this.relationIsSelected);
+            if (this.relationIsSelected == '' && this.relationContent == '') {
+                if (this.IsSelected != '') {
+                    myControl += 'MATCH p = (:' + this.$data.IsSelected;
+                } else {
+                    myControl += 'MATCH p = (';
+                }
+                if (this.entityContent != '') {
+                    myControl += '{name:"' + this.entityContent + '"}) LIMIT';
+                } else {
+                    myControl += ') return p LIMIT ';
+                }
+                this.controller = myControl + this.num;
             }
-            if (this.entityContent != '') {
-                myControl += '{name:"' + this.entityContent + '"})-';
-            } else {
-                myControl += ')-';
+            if (this.relationIsSelected != '' || this.relationContent != '' || (this.entityContent == '' && this.IsSelected == '')) {
+                myControl = 'MATCH p=';
+                if (this.IsSelected != '') {
+                    myControl += '(:' + this.$data.IsSelected;
+                } else {
+                    myControl += '(';
+                }
+                if (this.entityContent != '') {
+                    myControl += '{name:"' + this.entityContent + '"})-';
+                } else {
+                    myControl += ')-';
+                }
+                if (this.relationIsSelected != '') {
+                    myControl += '[:' + this.relationIsSelected;
+                } else {
+                    myControl += '[';
+                }
+                if (this.relationContent != '') {
+                    myControl += '{name:"' + this.relationContent + '"}]->() RETURN p LIMIT ';
+                } else {
+                    myControl += ']->() RETURN p LIMIT ';
+                }
+                this.controller = myControl + this.num;
             }
-            if (this.relationIsSelected != '') {
-                myControl += '[:' + this.relationIsSelected;
-            } else {
-                myControl += '[';
-            }
-            if (this.relationContent != '') {
-                myControl += '{name:"' + this.relationContent + '"}]->() RETURN p LIMIT ';
-            } else {
-                myControl += ']->() RETURN p LIMIT ';
-            }
-            this.controller = myControl + this.num;
+
             console.log(myControl);
             this.$refs.tempHtml.src += '';
         },
@@ -131,12 +149,6 @@ export default {
     },
     mounted() {
         let that = this;
-        this.$axios.post('/api/get_all_label').then(res => {
-            for (let i in res.data) {
-                console.log(i);
-                that.$data.select.push(i);
-            }
-        });
         this.$axios.post('/api/get_entity_label').then(res => {
             that.select = res.data;
         });
